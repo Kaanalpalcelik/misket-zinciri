@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Misket Zinciri</title>
+  <style>
+    :root{
+      --panel:rgba(9,17,24,.66);
+      --panel-border:rgba(255,255,255,.11);
+      --text:#eef6fb;
+      --muted:#b2c2cc;
+      --gold:#ffd76d;
+      --aqua:#84efff;
+      --green:#2ad59f;
+      --green2:#0e684d;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+    html,body{margin:0;height:100%;overflow:hidden;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(1200px 800px at 50% -10%, #193f54 0%, #0c1a25 38%, #03070b 100%);color:var(--text)}
+    .wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
+    .frame{position:relative;width:min(100vw,560px);height:min(100vh - 20px,980px);overflow:hidden;border-radius:30px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06)}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+    .hud-top{position:absolute;left:12px;right:12px;top:12px;display:grid;grid-template-columns:1fr auto;gap:10px;pointer-events:none}
+    .glass,.chip,.status{background:var(--panel);border:1px solid var(--panel-border);backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+    .glass{padding:12px 14px;border-radius:18px}
+    .title{font-size:17px;font-weight:900;letter-spacing:.02em}
+    .sub{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.35}
+    .stats{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+    .chip{min-width:76px;padding:10px 12px;border-radius:16px;text-align:center}
+    .chip .k{font-size:11px;color:var(--muted)}
+    .chip .v{font-size:18px;font-weight:900;margin-top:2px}
+    .hud-bottom{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:8px}
+    .status{padding:12px 14px;border-radius:18px;color:var(--muted);font-size:12px;line-height:1.35}
+    .buttons{display:flex;justify-content:flex-end;gap:8px}
+    button{pointer-events:auto;border:none;border-radius:16px;padding:12px 16px;color:#f7fbff;font-weight:800;cursor:pointer;background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08)}
+    button:active{transform:translateY(1px)}
+    .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(180deg,rgba(2,5,9,.22),rgba(2,5,9,.72));backdrop-filter:blur(4px)}
+    .card{width:min(100%,370px);border-radius:24px;padding:22px;background:linear-gradient(180deg,rgba(18,27,38,.97),rgba(10,16,24,.95));border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);text-align:center}
+    .card h1{margin:0 0 8px;font-size:28px}
+    .big{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,109,.22)}
+    .muted{font-size:13px;color:var(--muted);line-height:1.4}
+    @media (max-width:450px){.chip{min-width:70px;padding:8px 10px}.chip .v{font-size:16px}.title{font-size:15px}.sub,.status{font-size:11px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="frame">
+    <canvas id="game" width="720" height="1280"></canvas>
+
+    <div class="hud-top">
+      <div class="glass">
+        <div class="title">Misket Zinciri</div>
+        <div class="sub">Topu geriye çek, bırak ve tüm topları temizle. Orta deliğe giren renkli toplar ekstra puan kazandırır; beyaz top girerse bölüm baştan başlar.</div>
+      </div>
+      <div class="stats">
+        <div class="chip"><div class="k">Bölüm</div><div class="v" id="level">1</div></div>
+        <div class="chip"><div class="k">Süre</div><div class="v" id="time">0.0</div></div>
+        <div class="chip"><div class="k">Kalan</div><div class="v" id="left">0</div></div>
+        <div class="chip"><div class="k">Atış</div><div class="v" id="shots">0</div></div>
+        <div class="chip"><div class="k">Ödül</div><div class="v" id="coins">0</div></div>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="status" id="status">İpucu: Beyaz topu ne kadar geriye çekersen vuruş gücü o kadar artar. Tüm toplar durunca tekrar atış yapabilirsin.</div>
+      <div class="buttons">
+        <button id="musicBtn">Müzik Açık</button>
+        <button id="resetBtn">Bölümü Yeniden Başlat</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="card">
+        <h1 id="overlayTitle">Bölüm Temiz!</h1>
+        <div class="big" id="overlayBig">0.0 sn</div>
+        <div id="overlayMeta" style="margin:10px 0 8px;font-weight:800"></div>
+        <p class="muted" id="overlayText">Devam etmek için aşağıdan devam et.</p>
+        <div style="display:flex;justify-content:center;gap:10px;margin-top:16px">
+          <button id="overlayBtn">Devam</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+  const canvas=document.getElementById('game');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const el={
+    level:document.getElementById('level'), time:document.getElementById('time'), left:document.getElementById('left'), shots:document.getElementById('shots'), coins:document.getElementById('coins'), status:document.getElementById('status'), overlay:document.getElementById('overlay'), overlayTitle:document.getElementById('overlayTitle'), overlayBig:document.getElementById('overlayBig'), overlayMeta:document.getElementById('overlayMeta'), overlayText:document.getElementById('overlayText'), overlayBtn:document.getElementById('overlayBtn'), musicBtn:document.getElementById('musicBtn')
+  };
+
+  const levels=[
+    {
+      cue:[0.50,0.89],
+      targets:[[.50,.17,198],[.35,.22,38],[.67,.23,326],[.53,.30,146],[.27,.36,278],[.73,.40,60],[.41,.44,174],[.60,.50,212],[.22,.57,18],[.77,.60,128],[.45,.66,299],[.64,.72,92]],
+      obstacles:[[.28,.29,86,24],[.52,.22,24,110],[.72,.33,92,24],[.34,.54,110,26],[.66,.63,24,125]]
+    },
+    {
+      cue:[0.50,0.90],
+      targets:[[.44,.16,198],[.58,.18,41],[.27,.25,324],[.70,.24,146],[.49,.30,278],[.21,.37,60],[.77,.39,174],[.36,.46,212],[.63,.49,18],[.26,.59,128],[.73,.62,299],[.47,.68,92],[.58,.75,252]],
+      obstacles:[[.22,.23,82,24],[.41,.27,24,112],[.63,.27,24,112],[.75,.40,100,24],[.30,.49,102,24],[.53,.57,135,24],[.67,.70,24,120]]
+    }
+  ];
+
+  const state={
+    table:{topW:470,bottomW:590,topY:132,bottomY:1165,cx:W/2}, margin:28,
+    levelIndex:0, cue:null, targets:[], obstacles:[],
+    hole:{x:W/2,y:0,r:26,inner:18,pulse:0},
+    dragging:false, dragPoint:null, startedAt:null, elapsed:0,
+    shots:0, coins:0, finished:false, last:0, particles:[], popups:[],
+    shotComboCount:0, shotRegisteredHits:new Set(), audioCtx:null, audioUnlocked:false,
+    musicOn:true, musicTimer:null, nextAction:'next'
+  };
+
+  const friction=0.9825, restThreshold=0.10, vanishDelay=360, maxPull=185, railBounce=0.94, obstacleBounce=0.96;
+
+  function now(){return performance.now()}
+  function lerp(a,b,t){return a+(b-a)*t}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+  function speed(o){return Math.hypot(o.vx,o.vy)}
+  function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+  function widthAt(y){const t=(y-state.table.topY)/(state.table.bottomY-state.table.topY);return lerp(state.table.topW,state.table.bottomW,t)}
+  function leftAt(y){return state.table.cx-widthAt(y)/2}
+  function rightAt(y){return state.table.cx+widthAt(y)/2}
+  function place(u,v){const y=lerp(state.table.topY+48,state.table.bottomY-88,v);const l=leftAt(y)+state.margin;const r=rightAt(y)-state.margin;return{x:lerp(l,r,u),y}}
+
+  function updateHud(){el.level.textContent=String(state.levelIndex+1);el.time.textContent=state.elapsed.toFixed(1);el.left.textContent=String(state.targets.filter(t=>!t.dead).length);el.shots.textContent=String(state.shots);el.coins.textContent=String(state.coins);el.musicBtn.textContent=state.musicOn?'Müzik Açık':'Müzik Kapalı'}
+  function allStopped(){if(speed(state.cue)>0.2)return false;for(const t of state.targets){if(!t.dead&&speed(t)>0.2)return false;}return true}
+  function startTimer(){if(state.startedAt==null)state.startedAt=now()-state.elapsed*1000}
+  function addPopup(text,x,y,color='#ffd76d',big=false){state.popups.push({text,x,y,life:56,vy:1.1,color,big})}
+  function addParticles(x,y,h,count=14){for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*3.2;state.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:18+Math.random()*26,h})}}
+
+  function loadLevel(idx){
+    state.levelIndex=idx;
+    const data=levels[idx];
+    const cp=place(data.cue[0],data.cue[1]);
+    state.cue={x:cp.x,y:cp.y,r:23,vx:0,vy:0};
+    state.targets=data.targets.map((a,i)=>{const p=place(a[0],a[1]);return{id:i,x:p.x,y:p.y,r:19,vx:0,vy:0,h:a[2],hit:false,dead:false,hitAt:0}});
+    state.obstacles=data.obstacles.map(o=>{const p=place(o[0],o[1]);return{x:p.x-o[2]/2,y:p.y-o[3]/2,w:o[2],h:o[3],r:12}});
+    const hp=place(.50,.50); state.hole.x=hp.x; state.hole.y=hp.y;
+    state.dragging=false;state.dragPoint=null;state.startedAt=null;state.elapsed=0;state.shots=0;state.finished=false;state.particles=[];state.popups=[];state.shotComboCount=0;state.shotRegisteredHits.clear();
+    el.overlay.style.display='none'; updateHud();
+    el.status.textContent=`Bölüm ${idx+1}: Orta deliğe giren renkli toplar bonus verir. Beyaz top girerse bölüm baştan başlar.`;
+  }
+  function restartCurrentLevel(){ loadLevel(state.levelIndex); }
+
+  // ---- audio ----
+  function unlockAudio(){
+    if(state.audioUnlocked){ if(state.audioCtx?.state==='suspended') state.audioCtx.resume(); return; }
+    try{ state.audioCtx=new (window.AudioContext||window.webkitAudioContext)(); state.audioUnlocked=true; startMusic(); }catch(e){}
+  }
+  function tone(type,f1,f2,dur=0.08,gain=0.03){
+    if(!state.audioUnlocked||!state.audioCtx) return;
+    const ac=state.audioCtx,t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+    o.type=type; o.frequency.setValueAtTime(f1,t); o.frequency.exponentialRampToValueAtTime(Math.max(50,f2),t+dur);
+    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur);
+  }
+  function hitSound(power=1){ tone('sine', 240+80*power, 165, 0.06, 0.018*power); tone('triangle', 160, 110, 0.045, 0.010*power); }
+  function pocketSound(){ tone('triangle', 420, 180, 0.13, 0.03); }
+  function failSound(){ tone('sawtooth', 230, 95, 0.22, 0.045); }
+  function rewardSound(level=1){ tone('triangle', 430+level*60, 260+level*20, 0.12, 0.035); }
+  function applauseSound(){
+    if(!state.audioUnlocked||!state.audioCtx) return;
+    for(let i=0;i<6;i++){ setTimeout(()=>tone('square', 700+Math.random()*400, 220+Math.random()*120, 0.03, 0.016), i*45); }
+  }
+  function startMusic(){
+    stopMusic(); if(!state.musicOn||!state.audioUnlocked||!state.audioCtx) return;
+    const seq=[220,262,294,262,196,247,262,247]; let i=0;
+    state.musicTimer=setInterval(()=>{ if(!state.musicOn||!state.audioCtx) return; tone('triangle', seq[i%seq.length], seq[i%seq.length]*0.99, 0.22, 0.007); i++; }, 300);
+  }
+  function stopMusic(){ if(state.musicTimer){ clearInterval(state.musicTimer); state.musicTimer=null; } }
+
+  // ---- rewards / logic ----
+  function handleReward(ball,x,y){
+    if(state.shotRegisteredHits.has(ball.id)) return;
+    state.shotRegisteredHits.add(ball.id); state.shotComboCount += 1;
+    let gain=10, text='+10';
+    if(state.shotComboCount===2){gain=30;text='Çifte Kombo! +30';addPopup('Harika!',x,y-34,'#84efff',true); rewardSound(2); applauseSound();}
+    else if(state.shotComboCount===3){gain=55;text='Üçlü Kombo! +55';addPopup('Mükemmel!',x,y-36,'#aaff9b',true); rewardSound(3); applauseSound();}
+    else if(state.shotComboCount>=4){gain=80;text='Mega Kombo! +80';addPopup('Efsane!',x,y-36,'#ffd76d',true); rewardSound(4); applauseSound();}
+    else rewardSound(1);
+    state.coins += gain; addPopup(text,x,y,'#ffd76d',state.shotComboCount>=2);
+  }
+  function handleHoleBonus(ball){
+    if(ball.dead) return;
+    state.coins += 45;
+    ball.dead=true; ball.hit=true; pocketSound(); rewardSound(2); addParticles(ball.x,ball.y,ball.h,18); addPopup('Double Perfect! +45', ball.x, ball.y-10, '#ffde77', true);
+  }
+  function cueFallsInHole(){
+    state.cue.vx=0; state.cue.vy=0; failSound();
+    showOverlay('Faul!', 'Beyaz top deliğe girdi', 'Bu bölüm baştan başlayacak.', `Bölüm ${state.levelIndex+1}`, 'Tekrar Başlat', 'restart');
+  }
+
+  // ---- physics ----
+  function collideRails(ball){
+    const top=state.table.topY+state.margin,bottom=state.table.bottomY-state.margin;
+    if(ball.y-ball.r<top){ball.y=top+ball.r;ball.vy=Math.abs(ball.vy)*railBounce;hitSound(.6)}
+    if(ball.y+ball.r>bottom){ball.y=bottom-ball.r;ball.vy=-Math.abs(ball.vy)*railBounce;hitSound(.6)}
+    const L=leftAt(ball.y)+state.margin,R=rightAt(ball.y)-state.margin;
+    if(ball.x-ball.r<L){ball.x=L+ball.r;ball.vx=Math.abs(ball.vx)*railBounce;ball.vy*=.986;hitSound(.5)}
+    if(ball.x+ball.r>R){ball.x=R-ball.r;ball.vx=-Math.abs(ball.vx)*railBounce;ball.vy*=.986;hitSound(.5)}
+  }
+  function collideRect(ball,r){
+    const nx=clamp(ball.x,r.x,r.x+r.w), ny=clamp(ball.y,r.y,r.y+r.h);
+    let dx=ball.x-nx, dy=ball.y-ny; const d2=dx*dx+dy*dy; if(d2>=ball.r*ball.r) return;
+    if(d2<0.001){ const dl=Math.abs(ball.x-r.x), dr=Math.abs(ball.x-(r.x+r.w)), dt=Math.abs(ball.y-r.y), db=Math.abs(ball.y-(r.y+r.h)); const m=Math.min(dl,dr,dt,db); if(m===dl){dx=-1;dy=0}else if(m===dr){dx=1;dy=0}else if(m===dt){dx=0;dy=-1}else{dx=0;dy=1} }
+    else{const d=Math.sqrt(d2);dx/=d;dy/=d}
+    const pen=ball.r-Math.sqrt(Math.max(d2,0)); ball.x+=dx*(pen+0.6); ball.y+=dy*(pen+0.6);
+    const proj=ball.vx*dx+ball.vy*dy; if(proj<0){ ball.vx-=(1+obstacleBounce)*proj*dx; ball.vy-=(1+obstacleBounce)*proj*dy; hitSound(.75); }
+  }
+  function collideBalls(a,b,allowTrigger=false){
+    if(a.dead||b.dead) return false;
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||0.001,min=a.r+b.r;if(d>=min) return false;
+    const nx=dx/d,ny=dy/d,overlap=min-d; a.x-=nx*overlap*0.5;a.y-=ny*overlap*0.5;b.x+=nx*overlap*0.5;b.y+=ny*overlap*0.5;
+    const tx=-ny,ty=nx; const v1n=a.vx*nx+a.vy*ny,v1t=a.vx*tx+a.vy*ty,v2n=b.vx*nx+b.vy*ny,v2t=b.vx*tx+b.vy*ty; const e=0.97;
+    const nv1=(v1n*(1-e)+v2n*(1+e))/2, nv2=(v2n*(1-e)+v1n*(1+e))/2;
+    a.vx=tx*v1t+nx*nv1; a.vy=ty*v1t+ny*nv1; b.vx=tx*v2t+nx*nv2; b.vy=ty*v2t+ny*nv2; hitSound(clamp(Math.abs(v1n-v2n)/9,0.45,1.1));
+    if(allowTrigger && !b.hit && speed(a)>0.8){ b.hit=true; b.hitAt=now(); addParticles(b.x,b.y,b.h,10); handleReward(b,b.x,b.y); }
+    return true;
+  }
+  function checkHole(ball,isCue=false){
+    const dx=ball.x-state.hole.x, dy=ball.y-state.hole.y, d=Math.hypot(dx,dy);
+    if(isCue){
+      if(d < state.hole.inner - 1){ cueFallsInHole(); return true; }
+    } else {
+      if(d < state.hole.inner - 2){ handleHoleBonus(ball); return true; }
+    }
+    // slight gravity near pocket center for realism
+    if(d < state.hole.r + 8){
+      const force=(state.hole.r + 8 - d)*0.0035;
+      if(d>0.1){ ball.vx += (state.hole.x-ball.x)/d * force; ball.vy += (state.hole.y-ball.y)/d * force; }
+    }
+    return false;
+  }
+
+  function shoot(){
+    if(!state.dragPoint||state.finished||!allStopped()) return;
+    const dx=state.cue.x-state.dragPoint.x, dy=state.cue.y-state.dragPoint.y, len=Math.hypot(dx,dy); if(len<8) return;
+    const pull=Math.min(maxPull,len), power=6.2+pull*0.115, nx=dx/len, ny=dy/len; startTimer(); state.cue.vx=nx*power; state.cue.vy=ny*power; state.shots++; state.shotComboCount=0; state.shotRegisteredHits.clear(); updateHud(); el.status.textContent='Atış yapıldı. Zinciri izle!'; hitSound(.9);
+  }
+
+  function showOverlay(title,big,text,meta,btnText,action){
+    state.finished=true; state.nextAction=action; el.overlayTitle.textContent=title; el.overlayBig.textContent=big; el.overlayText.textContent=text; el.overlayMeta.textContent=meta; el.overlayBtn.textContent=btnText; el.overlay.style.display='flex';
+  }
+  el.overlayBtn.onclick=()=>{
+    el.overlay.style.display='none';
+    if(state.nextAction==='restart') restartCurrentLevel();
+    else if(state.nextAction==='next') loadLevel(Math.min(state.levelIndex+1, levels.length-1));
+    else if(state.nextAction==='done') loadLevel(0);
+  };
+
+  function update(dt){
+    if(state.startedAt!=null&&!state.finished) state.elapsed=(now()-state.startedAt)/1000;
+    state.hole.pulse += dt*0.04;
+    const movers=[state.cue,...state.targets.filter(t=>!t.dead)];
+    for(const o of movers){
+      o.x+=o.vx*dt; o.y+=o.vy*dt; o.vx*=friction; o.vy*=friction; if(speed(o)<restThreshold){o.vx=0;o.vy=0;}
+      collideRails(o); for(const ob of state.obstacles) collideRect(o,ob);
+    }
+    for(const t of state.targets){ if(!t.dead) collideBalls(state.cue,t,true); }
+    for(let i=0;i<state.targets.length;i++) for(let j=i+1;j<state.targets.length;j++){ const a=state.targets[i], b=state.targets[j]; if(a.dead||b.dead) continue; const ah=a.hit,bh=b.hit; collideBalls(a,b,ah); collideBalls(b,a,bh); }
+
+    if(!state.finished){
+      if(checkHole(state.cue,true)) return;
+      for(const t of state.targets){ if(!t.dead) checkHole(t,false); }
+    }
+
+    const n=now();
+    for(const t of state.targets){ if(!t.dead&&t.hit&&n-t.hitAt>vanishDelay){ t.dead=true; addParticles(t.x,t.y,t.h,16); hitSound(.5); } }
+    for(let i=state.particles.length-1;i>=0;i--){const p=state.particles[i];p.x+=p.vx*dt*.95;p.y+=p.vy*dt*.95;p.vx*=.97;p.vy*=.97;p.life-=1.15;if(p.life<=0)state.particles.splice(i,1)}
+    for(let i=state.popups.length-1;i>=0;i--){const p=state.popups[i];p.y-=p.vy*dt;p.life-=1.4;if(p.life<=0)state.popups.splice(i,1)}
+    updateHud();
+
+    const left=state.targets.filter(t=>!t.dead).length;
+    if(!state.finished && left===0){
+      applauseSound(); rewardSound(5);
+      if(state.levelIndex < levels.length-1){ showOverlay('Bölüm Temiz!', state.elapsed.toFixed(1)+' sn', '1. bölümü geçtin. 2. bölüm bir tık daha zor.', `${state.shots} atış • ${state.coins} ödül`, '2. Bölüme Geç', 'next'); }
+      else { showOverlay('Tebrikler!', state.elapsed.toFixed(1)+' sn', 'Tüm bölümler tamamlandı. Baştan oynayıp skorunu geliştirebilirsin.', `${state.shots} atış • ${state.coins} ödül`, 'Baştan Oyna', 'done'); }
+    } else if(!state.finished && allStopped() && state.startedAt!=null){
+      el.status.textContent='Hazır. Beyaz topu tekrar geriye çekip yeni atış yapabilirsin.';
+    }
+  }
+
+  function drawTable(){
+    ctx.clearRect(0,0,W,H);
+    const cx=state.table.cx, topY=state.table.topY, bottomY=state.table.bottomY, tw=state.table.topW, bw=state.table.bottomW;
+    const outer=new Path2D(); outer.moveTo(cx-tw/2,topY); outer.lineTo(cx+tw/2,topY); outer.lineTo(cx+bw/2,bottomY); outer.lineTo(cx-bw/2,bottomY); outer.closePath();
+    ctx.save(); ctx.shadowColor='rgba(0,0,0,.52)'; ctx.shadowBlur=34; ctx.shadowOffsetY=22; ctx.fillStyle='#724831'; ctx.fill(outer); ctx.restore();
+    ctx.save(); ctx.clip(outer);
+    const wood=ctx.createLinearGradient(0,topY,0,bottomY); wood.addColorStop(0,'rgba(255,255,255,.22)'); wood.addColorStop(.35,'rgba(255,255,255,.04)'); wood.addColorStop(1,'rgba(0,0,0,.24)'); ctx.fillStyle=wood; ctx.fillRect(0,topY-5,W,bottomY-topY+10);
+    for(let i=0;i<10;i++){ctx.strokeStyle=`rgba(255,255,255,${i?0.025:0.07})`; ctx.lineWidth=2; const y=topY+i*(bottomY-topY)/10; ctx.beginPath(); ctx.moveTo(cx-tw/2,y); ctx.lineTo(cx+bw/2,y+75); ctx.stroke(); }
+    ctx.restore();
+
+    const m=state.margin;
+    const inner=new Path2D(); inner.moveTo(cx-tw/2+m,topY+m); inner.lineTo(cx+tw/2-m,topY+m); inner.lineTo(cx+bw/2-m,bottomY-m); inner.lineTo(cx-bw/2+m,bottomY-m); inner.closePath();
+    ctx.save(); ctx.clip(inner);
+    const felt=ctx.createLinearGradient(0,topY,0,bottomY); felt.addColorStop(0,'#2be0a7'); felt.addColorStop(.35,'#22b882'); felt.addColorStop(.74,'#157d59'); felt.addColorStop(1,'#0d5d43'); ctx.fillStyle=felt; ctx.fillRect(0,topY,W,bottomY-topY);
+    ctx.globalAlpha=.07; for(let i=0;i<36;i++){ctx.fillStyle=i%2?'#fff':'#000'; ctx.fillRect(0,topY+i*25,W,10)} ctx.globalAlpha=1;
+    const gloss=ctx.createRadialGradient(cx,topY+220,60,cx,topY+270,470); gloss.addColorStop(0,'rgba(255,255,255,.18)'); gloss.addColorStop(.35,'rgba(255,255,255,.05)'); gloss.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=gloss; ctx.fillRect(0,topY,W,bottomY-topY);
+    ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=2; ctx.stroke(inner);
+
+    // center pocket
+    const pulse=(Math.sin(state.hole.pulse)+1)/2;
+    const holeGlow=ctx.createRadialGradient(state.hole.x,state.hole.y,2,state.hole.x,state.hole.y,state.hole.r+18);
+    holeGlow.addColorStop(0,'rgba(0,0,0,.75)'); holeGlow.addColorStop(.55,'rgba(20,10,10,.55)'); holeGlow.addColorStop(1,`rgba(255,215,109,${0.08+0.10*pulse})`);
+    ctx.fillStyle=holeGlow; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.r+16,0,Math.PI*2); ctx.fill();
+    const rim=ctx.createLinearGradient(0,state.hole.y-state.hole.r,0,state.hole.y+state.hole.r); rim.addColorStop(0,'rgba(255,220,150,.65)'); rim.addColorStop(1,'rgba(90,50,20,.7)'); ctx.strokeStyle=rim; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.r,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='rgba(8,8,10,.96)'; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.inner,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=3; ctx.stroke(outer);
+  }
+  function drawObstacle(o){ ctx.beginPath(); ctx.roundRect(o.x,o.y,o.w,o.h,o.r); const g=ctx.createLinearGradient(o.x,o.y,o.x,o.y+o.h); g.addColorStop(0,'#825a3f'); g.addColorStop(.45,'#67442f'); g.addColorStop(1,'#3f2b1f'); ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1.5; ctx.stroke(); ctx.beginPath(); ctx.roundRect(o.x+4,o.y+4,o.w-8,Math.max(7,o.h*.25),Math.min(8,o.r-2)); ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fill(); }
+  function drawBall(b,isCue=false){
+    if(b.dead) return; const alpha=b.hit?clamp(1-(now()-b.hitAt)/vanishDelay,0.2,1):1; ctx.save(); ctx.globalAlpha=alpha;
+    ctx.fillStyle='rgba(0,0,0,.24)'; ctx.beginPath(); ctx.ellipse(b.x+1,b.y+b.r*.82,b.r*.98,b.r*.36,0,0,Math.PI*2); ctx.fill();
+    const g=ctx.createRadialGradient(b.x-b.r*.35,b.y-b.r*.45,2,b.x,b.y,b.r*1.08);
+    if(isCue){ g.addColorStop(0,'#ffffff'); g.addColorStop(.55,'#eaf1f7'); g.addColorStop(1,'#97a4b0'); }
+    else{ g.addColorStop(0,`hsla(${b.h},96%,84%,1)`); g.addColorStop(.52,`hsla(${b.h},90%,60%,1)`); g.addColorStop(1,`hsla(${b.h},82%,28%,1)`); }
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.clip(); ctx.globalAlpha=.14; for(let i=0;i<3;i++){ctx.strokeStyle='#fff'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(b.x-7+i*5,b.y+1+i*2,b.r*.78,-1.1,1.05); ctx.stroke();} ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.73)'; ctx.beginPath(); ctx.ellipse(b.x-b.r*.29,b.y-b.r*.35,b.r*.28,b.r*.17,-.45,0,Math.PI*2); ctx.fill();
+    if(b.hit){ const p=(now()-b.hitAt)/vanishDelay; ctx.strokeStyle=`rgba(255,255,255,${0.8-p*0.55})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(b.x,b.y,b.r+8+p*18,0,Math.PI*2); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawAim(){
+    if(!state.dragging||!state.dragPoint||!allStopped()||state.finished) return; const dx=state.cue.x-state.dragPoint.x,dy=state.cue.y-state.dragPoint.y,len=Math.hypot(dx,dy); if(len<5)return; const pull=Math.min(maxPull,len),nx=dx/len,ny=dy/len;
+    ctx.strokeStyle='rgba(255,255,255,.36)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(state.cue.x,state.cue.y); ctx.lineTo(state.dragPoint.x,state.dragPoint.y); ctx.stroke();
+    ctx.save(); ctx.setLineDash([14,10]); const grad=ctx.createLinearGradient(state.cue.x,state.cue.y,state.cue.x+nx*280,state.cue.y+ny*280); grad.addColorStop(0,'rgba(255,255,255,.98)'); grad.addColorStop(1,'rgba(132,239,255,.12)'); ctx.strokeStyle=grad; ctx.lineWidth=3.5; ctx.beginPath(); ctx.moveTo(state.cue.x,state.cue.y); ctx.lineTo(state.cue.x+nx*(190+pull*.85),state.cue.y+ny*(190+pull*.85)); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); ctx.arc(state.cue.x,state.cue.y,state.cue.r+8+pull*.06,0,Math.PI*2); ctx.strokeStyle=`rgba(255,215,109,${0.18+pull/maxPull*0.5})`; ctx.lineWidth=3; ctx.stroke();
+  }
+  function drawParticles(){ for(const p of state.particles){ ctx.save(); ctx.globalAlpha=clamp(p.life/28,0,1); ctx.fillStyle=`hsl(${p.h},95%,72%)`; ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); ctx.restore(); } }
+  function drawPopups(){ for(const p of state.popups){ ctx.save(); ctx.globalAlpha=clamp(p.life/45,0,1); ctx.fillStyle=p.color; ctx.font=`${p.big?800:700} ${p.big?28:20}px Inter, system-ui`; ctx.textAlign='center'; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=5; ctx.strokeText(p.text,p.x,p.y); ctx.fillText(p.text,p.x,p.y); ctx.restore(); } }
+  function draw(){ drawTable(); for(const o of state.obstacles) drawObstacle(o); drawAim(); for(const t of state.targets) drawBall(t,false); drawBall(state.cue,true); drawParticles(); drawPopups(); }
+  function loop(ts){ if(!state.last) state.last=ts; const dt=Math.min(24,ts-state.last)/16.666; state.last=ts; if(!state.finished) update(dt); draw(); requestAnimationFrame(loop); }
+
+  function localPoint(e){ const r=canvas.getBoundingClientRect(); return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}; }
+  canvas.addEventListener('pointerdown',e=>{ unlockAudio(); if(state.finished||!allStopped()) return; const p=localPoint(e); if(dist(p,state.cue)<=state.cue.r+26){ state.dragging=true; state.dragPoint=p; canvas.setPointerCapture(e.pointerId); } });
+  canvas.addEventListener('pointermove',e=>{ if(!state.dragging) return; let p=localPoint(e); const dx=p.x-state.cue.x,dy=p.y-state.cue.y,len=Math.hypot(dx,dy); if(len>maxPull) p={x:state.cue.x+dx/len*maxPull,y:state.cue.y+dy/len*maxPull}; state.dragPoint=p; });
+  function release(){ if(!state.dragging) return; state.dragging=false; shoot(); state.dragPoint=null; }
+  canvas.addEventListener('pointerup',release); canvas.addEventListener('pointercancel',release);
+  document.getElementById('resetBtn').onclick=()=>{ unlockAudio(); restartCurrentLevel(); };
+  el.musicBtn.onclick=()=>{ unlockAudio(); state.musicOn=!state.musicOn; if(state.musicOn) startMusic(); else stopMusic(); updateHud(); };
+
+  loadLevel(0); updateHud(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
