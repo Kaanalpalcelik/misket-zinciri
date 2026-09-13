@@ -20,15 +20,15 @@
     .wrap{height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
     .frame{position:relative;width:min(100vw,560px);height:min(100vh - 20px,980px);overflow:hidden;border-radius:30px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06)}
     canvas{display:block;width:100%;height:100%;touch-action:none}
-    .hud-top{position:absolute;left:12px;right:12px;top:12px;display:grid;grid-template-columns:1fr auto;gap:10px;pointer-events:none}
+    .hud-top{position:absolute;left:12px;right:12px;top:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
     .glass,.chip,.status{background:var(--panel);border:1px solid var(--panel-border);backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-    .glass{padding:12px 14px;border-radius:18px}
-    .title{font-size:17px;font-weight:900;letter-spacing:.02em}
-    .sub{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.35}
-    .stats{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-    .chip{min-width:76px;padding:10px 12px;border-radius:16px;text-align:center}
-    .chip .k{font-size:11px;color:var(--muted)}
-    .chip .v{font-size:18px;font-weight:900;margin-top:2px}
+    .glass{align-self:flex-start;padding:7px 11px;border-radius:14px;max-width:210px}
+    .title{font-size:15px;font-weight:900;letter-spacing:.02em;white-space:nowrap}
+    .sub{display:none}
+    .stats{width:100%;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+    .chip{min-width:0;padding:6px 4px;border-radius:12px;text-align:center}
+    .chip .k{font-size:9px;color:var(--muted)}
+    .chip .v{font-size:15px;font-weight:900;margin-top:1px}
     .hud-bottom{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:8px}
     .status{padding:12px 14px;border-radius:18px;color:var(--muted);font-size:12px;line-height:1.35}
     .buttons{display:flex;justify-content:flex-end;gap:8px}
@@ -39,7 +39,7 @@
     .card h1{margin:0 0 8px;font-size:28px}
     .big{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,109,.22)}
     .muted{font-size:13px;color:var(--muted);line-height:1.4}
-    @media (max-width:450px){.chip{min-width:70px;padding:8px 10px}.chip .v{font-size:16px}.title{font-size:15px}.sub,.status{font-size:11px}}
+    @media (max-width:450px){.hud-top{left:8px;right:8px;top:8px}.glass{padding:6px 10px}.chip{padding:5px 2px}.chip .v{font-size:14px}.chip .k{font-size:8px}.title{font-size:14px}.status{font-size:10px;padding:9px 11px}.buttons{gap:6px}button{padding:10px 11px;font-size:12px}}
   </style>
 </head>
 <body>
@@ -50,7 +50,7 @@
     <div class="hud-top">
       <div class="glass">
         <div class="title">Misket Zinciri</div>
-        <div class="sub">Topu geriye çek, bırak ve tüm topları temizle. Orta deliğe giren renkli toplar ekstra puan kazandırır; beyaz top girerse bölüm baştan başlar.</div>
+        <div class="sub">Parmağınla çek · bırak · zinciri temizle</div>
       </div>
       <div class="stats">
         <div class="chip"><div class="k">Bölüm</div><div class="v" id="level">1</div></div>
@@ -94,11 +94,15 @@
 
   const levels=[
     {
+      name:'Klasik Masa',
+      hasHole:false,
       cue:[0.50,0.89],
-      targets:[[.50,.17,198],[.35,.22,38],[.67,.23,326],[.53,.30,146],[.27,.36,278],[.73,.40,60],[.41,.44,174],[.60,.50,212],[.22,.57,18],[.77,.60,128],[.45,.66,299],[.64,.72,92]],
+      targets:[[.50,.17,197],[.35,.22,42],[.67,.23,330],[.53,.30,148],[.27,.36,281],[.73,.40,59],[.41,.44,173],[.60,.50,210],[.22,.57,18],[.77,.60,130],[.45,.66,297],[.64,.72,92]],
       obstacles:[[.28,.29,86,24],[.52,.22,24,110],[.72,.33,92,24],[.34,.54,110,26],[.66,.63,24,125]]
     },
     {
+      name:'Double Perfect',
+      hasHole:true,
       cue:[0.50,0.90],
       targets:[[.44,.16,198],[.58,.18,41],[.27,.25,324],[.70,.24,146],[.49,.30,278],[.21,.37,60],[.77,.39,174],[.36,.46,212],[.63,.49,18],[.26,.59,128],[.73,.62,299],[.47,.68,92],[.58,.75,252]],
       obstacles:[[.22,.23,82,24],[.41,.27,24,112],[.63,.27,24,112],[.75,.40,100,24],[.30,.49,102,24],[.53,.57,135,24],[.67,.70,24,120]]
@@ -106,7 +110,7 @@
   ];
 
   const state={
-    table:{topW:470,bottomW:590,topY:132,bottomY:1165,cx:W/2}, margin:28,
+    table:{topW:470,bottomW:590,topY:220,bottomY:1110,cx:W/2}, margin:28,
     levelIndex:0, cue:null, targets:[], obstacles:[],
     hole:{x:W/2,y:0,r:26,inner:18,pulse:0},
     dragging:false, dragPoint:null, startedAt:null, elapsed:0,
@@ -143,7 +147,7 @@
     const hp=place(.50,.50); state.hole.x=hp.x; state.hole.y=hp.y;
     state.dragging=false;state.dragPoint=null;state.startedAt=null;state.elapsed=0;state.shots=0;state.finished=false;state.particles=[];state.popups=[];state.shotComboCount=0;state.shotRegisteredHits.clear();
     el.overlay.style.display='none'; updateHud();
-    el.status.textContent=`Bölüm ${idx+1}: Orta deliğe giren renkli toplar bonus verir. Beyaz top girerse bölüm baştan başlar.`;
+    el.status.textContent=data.hasHole ? `Bölüm ${idx+1} · Double Perfect: Renkli top deliğe girerse +45, beyaz top girerse bölüm sıfırlanır.` : `Bölüm ${idx+1} · Klasik Masa: Tüm renkli topları en kısa sürede temizle.`;
   }
   function restartCurrentLevel(){ loadLevel(state.levelIndex); }
 
@@ -159,13 +163,22 @@
     g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur);
   }
-  function hitSound(power=1){ tone('sine', 240+80*power, 165, 0.06, 0.018*power); tone('triangle', 160, 110, 0.045, 0.010*power); }
-  function pocketSound(){ tone('triangle', 420, 180, 0.13, 0.03); }
-  function failSound(){ tone('sawtooth', 230, 95, 0.22, 0.045); }
-  function rewardSound(level=1){ tone('triangle', 430+level*60, 260+level*20, 0.12, 0.035); }
+  function noiseBurst(dur=0.035,gain=0.025,filterHz=2200){
+    if(!state.audioUnlocked||!state.audioCtx) return;
+    const ac=state.audioCtx, len=Math.max(1,Math.floor(ac.sampleRate*dur)), buf=ac.createBuffer(1,len,ac.sampleRate), data=buf.getChannelData(0);
+    for(let i=0;i<len;i++){ const env=1-i/len; data[i]=(Math.random()*2-1)*env; }
+    const src=ac.createBufferSource(), filter=ac.createBiquadFilter(), g=ac.createGain();
+    src.buffer=buf; filter.type='bandpass'; filter.frequency.value=filterHz; filter.Q.value=.8; g.gain.value=gain; src.connect(filter); filter.connect(g); g.connect(ac.destination); src.start();
+  }
+  function hitSound(power=1){
+    const p=clamp(power,.35,1.25); noiseBurst(.028,0.022*p,1900+500*p); tone('sine',170+55*p,105,0.045,0.012*p);
+  }
+  function pocketSound(){ noiseBurst(.08,.035,900); tone('triangle',330,125,0.16,0.025); }
+  function failSound(){ tone('sawtooth',230,95,0.22,0.045); }
+  function rewardSound(level=1){ tone('triangle',430+level*70,280+level*25,0.13,0.03); }
   function applauseSound(){
     if(!state.audioUnlocked||!state.audioCtx) return;
-    for(let i=0;i<6;i++){ setTimeout(()=>tone('square', 700+Math.random()*400, 220+Math.random()*120, 0.03, 0.016), i*45); }
+    for(let i=0;i<10;i++){ setTimeout(()=>noiseBurst(.045,0.018+Math.random()*.01,900+Math.random()*1400), i*48); }
   }
   function startMusic(){
     stopMusic(); if(!state.musicOn||!state.audioUnlocked||!state.audioCtx) return;
@@ -229,7 +242,6 @@
     } else {
       if(d < state.hole.inner - 2){ handleHoleBonus(ball); return true; }
     }
-    // slight gravity near pocket center for realism
     if(d < state.hole.r + 8){
       const force=(state.hole.r + 8 - d)*0.0035;
       if(d>0.1){ ball.vx += (state.hole.x-ball.x)/d * force; ball.vy += (state.hole.y-ball.y)/d * force; }
@@ -264,7 +276,7 @@
     for(const t of state.targets){ if(!t.dead) collideBalls(state.cue,t,true); }
     for(let i=0;i<state.targets.length;i++) for(let j=i+1;j<state.targets.length;j++){ const a=state.targets[i], b=state.targets[j]; if(a.dead||b.dead) continue; const ah=a.hit,bh=b.hit; collideBalls(a,b,ah); collideBalls(b,a,bh); }
 
-    if(!state.finished){
+    if(!state.finished && levels[state.levelIndex].hasHole){
       if(checkHole(state.cue,true)) return;
       for(const t of state.targets){ if(!t.dead) checkHole(t,false); }
     }
@@ -278,7 +290,7 @@
     const left=state.targets.filter(t=>!t.dead).length;
     if(!state.finished && left===0){
       applauseSound(); rewardSound(5);
-      if(state.levelIndex < levels.length-1){ showOverlay('Bölüm Temiz!', state.elapsed.toFixed(1)+' sn', '1. bölümü geçtin. 2. bölüm bir tık daha zor.', `${state.shots} atış • ${state.coins} ödül`, '2. Bölüme Geç', 'next'); }
+      if(state.levelIndex < levels.length-1){ showOverlay('Bölüm Temiz!', state.elapsed.toFixed(1)+' sn', 'Klasik masa tamamlandı. 2. bölümde Double Perfect deliği açılıyor ve düzen zorlaşıyor.', `${state.shots} atış • ${state.coins} ödül`, '2. Bölüme Geç', 'next'); }
       else { showOverlay('Tebrikler!', state.elapsed.toFixed(1)+' sn', 'Tüm bölümler tamamlandı. Baştan oynayıp skorunu geliştirebilirsin.', `${state.shots} atış • ${state.coins} ödül`, 'Baştan Oyna', 'done'); }
     } else if(!state.finished && allStopped() && state.startedAt!=null){
       el.status.textContent='Hazır. Beyaz topu tekrar geriye çekip yeni atış yapabilirsin.';
@@ -303,13 +315,14 @@
     const gloss=ctx.createRadialGradient(cx,topY+220,60,cx,topY+270,470); gloss.addColorStop(0,'rgba(255,255,255,.18)'); gloss.addColorStop(.35,'rgba(255,255,255,.05)'); gloss.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=gloss; ctx.fillRect(0,topY,W,bottomY-topY);
     ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=2; ctx.stroke(inner);
 
-    // center pocket
+    if(levels[state.levelIndex].hasHole){
     const pulse=(Math.sin(state.hole.pulse)+1)/2;
     const holeGlow=ctx.createRadialGradient(state.hole.x,state.hole.y,2,state.hole.x,state.hole.y,state.hole.r+18);
     holeGlow.addColorStop(0,'rgba(0,0,0,.75)'); holeGlow.addColorStop(.55,'rgba(20,10,10,.55)'); holeGlow.addColorStop(1,`rgba(255,215,109,${0.08+0.10*pulse})`);
     ctx.fillStyle=holeGlow; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.r+16,0,Math.PI*2); ctx.fill();
     const rim=ctx.createLinearGradient(0,state.hole.y-state.hole.r,0,state.hole.y+state.hole.r); rim.addColorStop(0,'rgba(255,220,150,.65)'); rim.addColorStop(1,'rgba(90,50,20,.7)'); ctx.strokeStyle=rim; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.r,0,Math.PI*2); ctx.stroke();
     ctx.fillStyle='rgba(8,8,10,.96)'; ctx.beginPath(); ctx.arc(state.hole.x,state.hole.y,state.hole.inner,0,Math.PI*2); ctx.fill();
+    }
     ctx.restore();
 
     ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=3; ctx.stroke(outer);
