@@ -100,28 +100,38 @@ const ui={
 
 const LEVELS=[
   {
-    name:'Grand Opening',holes:[],cue:[.50,.89],
+    name:'Grand Opening',holes:[],boostZones:[],bonusTargets:[],cue:[.50,.89],
     targets:[[.50,.17,198],[.35,.22,36],[.67,.23,326],[.53,.30,146],[.27,.36,278],[.73,.40,60],[.41,.44,174],[.60,.50,212],[.22,.57,18],[.77,.60,128],[.45,.66,299],[.64,.72,92]],
     obstacles:[[.28,.29,86,24],[.52,.22,24,110],[.72,.33,92,24],[.34,.54,110,26],[.66,.63,24,125]]
   },
   {
-    name:'Double Perfect',holes:[{u:.50,v:.50,type:'center'}],cue:[.50,.90],
+    name:'Double Perfect',holes:[{u:.50,v:.50,type:'center'}],boostZones:[],bonusTargets:[],cue:[.50,.90],
     targets:[[.44,.16,198],[.58,.18,41],[.27,.25,324],[.70,.24,146],[.49,.30,278],[.21,.37,60],[.77,.39,174],[.36,.46,212],[.63,.49,18],[.26,.59,128],[.73,.62,299],[.47,.68,92],[.58,.75,252]],
     obstacles:[[.22,.23,82,24],[.41,.27,24,112],[.63,.27,24,112],[.75,.40,100,24],[.30,.49,102,24],[.53,.57,135,24],[.67,.70,24,120]]
   },
   {
-    name:'Royal Twin Pockets',holes:[{u:.50,v:.50,type:'center'},{u:.18,v:.18,type:'corner'}],cue:[.50,.90],
+    name:'Royal Twin Pockets',holes:[{u:.50,v:.50,type:'center'},{u:.18,v:.18,type:'corner'}],boostZones:[],bonusTargets:[],cue:[.50,.90],
     targets:[[.38,.17,198],[.54,.17,41],[.71,.20,324],[.26,.27,146],[.60,.29,278],[.43,.35,60],[.77,.39,174],[.28,.47,212],[.59,.50,18],[.70,.60,128],[.43,.66,299],[.58,.74,92]],
     obstacles:[[.33,.24,84,24],[.61,.27,24,110],[.72,.45,92,24],[.31,.56,96,24],[.58,.64,24,112]]
+  },
+  {
+    name:'Blue Flame Run',holes:[{u:.72,v:.24,type:'corner'}],boostZones:[{u:.50,v:.57,r:50,mult:5}],bonusTargets:[3,8],cue:[.50,.90],
+    targets:[[.32,.17,206],[.51,.18,44],[.68,.20,326],[.24,.30,50],[.54,.31,278],[.74,.39,165],[.35,.44,212],[.63,.48,15],[.26,.60,128],[.72,.61,298],[.43,.70,92],[.61,.75,250]],
+    obstacles:[[.36,.26,92,24],[.64,.34,24,108],[.31,.52,100,24],[.69,.66,100,24]]
+  },
+  {
+    name:'Royal Inferno',holes:[{u:.50,v:.48,type:'center'},{u:.82,v:.18,type:'corner'}],boostZones:[{u:.29,v:.38,r:45,mult:5},{u:.70,v:.66,r:45,mult:5}],bonusTargets:[1,6,10],cue:[.50,.91],
+    targets:[[.37,.16,194],[.55,.18,45],[.70,.24,320],[.24,.29,145],[.47,.33,275],[.76,.39,58],[.35,.47,175],[.63,.51,215],[.24,.61,20],[.72,.60,130],[.43,.68,300],[.59,.75,94]],
+    obstacles:[[.47,.24,24,100],[.72,.37,88,24],[.33,.56,98,24],[.56,.69,24,105]]
   }
 ];
 
 const S={
   table:{topW:452,bottomW:604,topY:220,bottomY:1110,cx:W/2},margin:30,
-  levelIndex:0,cue:null,targets:[],obstacles:[],holes:[],
+  levelIndex:0,cue:null,targets:[],obstacles:[],holes:[],boostZones:[],
   dragging:false,dragPoint:null,startedAt:null,elapsed:0,shots:0,coins:0,finished:false,nextAction:'next',
   last:0,particles:[],sparks:[],popups:[],shotComboCount:0,shotRegisteredHits:new Set(),
-  audioCtx:null,masterGain:null,sfxGain:null,musicGain:null,audioUnlocked:false,musicOn:true,musicTimer:null,crowdSource:null
+  audioCtx:null,masterGain:null,sfxGain:null,musicGain:null,audioUnlocked:false,musicOn:true,musicTimer:null,crowdSource:null,boostSerial:0
 };
 
 const CFG={friction:.9825,rest:.10,vanishDelay:360,maxPull:190,railBounce:.94,obstacleBounce:.96};
@@ -146,14 +156,18 @@ function addGoldSpark(x,y,count=12){for(let i=0;i<count;i++){const a=Math.random
 
 function loadLevel(idx){
   S.levelIndex=idx;const d=LEVELS[idx],cp=place(d.cue[0],d.cue[1]);
-  S.cue={x:cp.x,y:cp.y,r:23,vx:0,vy:0};
-  S.targets=d.targets.map((a,i)=>{const p=place(a[0],a[1]);return{id:i,x:p.x,y:p.y,r:19,vx:0,vy:0,h:a[2],hit:false,dead:false,hitAt:0}});
+  S.cue={_key:'cue',x:cp.x,y:cp.y,r:23,vx:0,vy:0};
+  const bonusSet=new Set(d.bonusTargets||[]);
+  S.targets=d.targets.map((a,i)=>{const p=place(a[0],a[1]);return{_key:'t'+i,id:i,x:p.x,y:p.y,r:19,vx:0,vy:0,h:a[2],hit:false,dead:false,hitAt:0,bonus:bonusSet.has(i)}});
   S.obstacles=d.obstacles.map(o=>{const p=place(o[0],o[1]);return{x:p.x-o[2]/2,y:p.y-o[3]/2,w:o[2],h:o[3],r:12}});
   S.holes=(d.holes||[]).map(h=>{const p=place(h.u,h.v);return{x:p.x,y:p.y,r:h.type==='corner'?24:26,inner:h.type==='corner'?16:18,pulse:Math.random()*6.28,type:h.type}});
-  S.dragging=false;S.dragPoint=null;S.startedAt=null;S.elapsed=0;S.shots=0;S.finished=false;S.particles=[];S.sparks=[];S.popups=[];S.shotComboCount=0;S.shotRegisteredHits.clear();ui.overlay.style.display='none';updateHud();
+  S.boostZones=(d.boostZones||[]).map((z,i)=>{const p=place(z.u,z.v);return{id:i,x:p.x,y:p.y,r:z.r||46,mult:z.mult||5,pulse:Math.random()*6.28,inside:new Set()}});
+  S.dragging=false;S.dragPoint=null;S.startedAt=null;S.elapsed=0;S.shots=0;S.finished=false;S.particles=[];S.sparks=[];S.popups=[];S.shotComboCount=0;S.shotRegisteredHits.clear();S.boostSerial=0;ui.overlay.style.display='none';updateHud();
   if(idx===0)ui.status.textContent='Bölüm 1 · Grand Opening: tüm renkli topları temizle.';
   else if(idx===1)ui.status.textContent='Bölüm 2 · Orta delik bonus verir; beyaz top girerse bölüm sıfırlanır.';
-  else ui.status.textContent='Bölüm 3 · Royal Twin Pockets: orta ve köşe deliği bonus verir; beyaz top fauldür.';
+  else if(idx===2)ui.status.textContent='Bölüm 3 · Royal Twin Pockets: orta ve köşe deliği bonus verir; beyaz top fauldür.';
+  else if(idx===3)ui.status.textContent='Bölüm 4 · Blue Flame Run: mavi alev bölgesinden geçen top 5× hızlanır. Altın halkalı toplar ekstra ödül verir.';
+  else ui.status.textContent='Bölüm 5 · Royal Inferno: iki 5× alev kapısı, iki delik ve üç altın hedef. Hızını doğru kullan.';
 }
 
 // ---------- Audio ----------
@@ -179,6 +193,7 @@ function hitSound(power=1){if(!S.audioUnlocked)return;const p=clamp(power,.35,1.
 function pocketSound(){if(!S.audioUnlocked)return;noiseBurst(.08,.038,850);osc('triangle',345,118,.18,.03)}
 function failSound(){if(!S.audioUnlocked)return;osc('sawtooth',220,86,.26,.045)}
 function rewardSound(level=1){if(!S.audioUnlocked)return;osc('triangle',460+level*72,290+level*30,.14,.032)}
+function boostSound(){if(!S.audioUnlocked)return;noiseBurst(.09,.032,2600);osc('sawtooth',240,920,.13,.022);osc('triangle',520,1040,.11,.016)}
 function applauseSound(){if(!S.audioUnlocked)return;for(let i=0;i<12;i++)setTimeout(()=>{ensureAudio();noiseBurst(.046,.018+Math.random()*.012,900+Math.random()*1400)},i*42)}
 function stopMusic(){if(S.musicTimer){clearInterval(S.musicTimer);S.musicTimer=null}}
 function startMusic(){
@@ -199,6 +214,7 @@ function handleReward(ball,x,y){
   else if(S.shotComboCount>=4){gain=80;text='Mega Kombo! +80';addPopup('EFSANE!',x,y-36,'#f7d778',true);rewardSound(4);applauseSound()}
   else rewardSound(1);
   S.coins+=gain;addPopup(text,x,y,'#f5d274',S.shotComboCount>=2);addGoldSpark(x,y,8+S.shotComboCount*2);
+  if(ball.bonus){S.coins+=25;addPopup('GOLD TARGET +25',x,y-58,'#fff0a8',true);addGoldSpark(x,y,22);rewardSound(4)}
 }
 function handleHoleBonus(ball,hole){if(ball.dead)return;S.coins+=45;ball.dead=true;ball.hit=true;pocketSound();rewardSound(3);applauseSound();addParticles(ball.x,ball.y,ball.h,18);addGoldSpark(ball.x,ball.y,24);addPopup(hole.type==='corner'?'ROYAL BONUS +45':'DOUBLE PERFECT +45',ball.x,ball.y-10,'#ffe59a',true)}
 function cueFallsInHole(){S.cue.vx=0;S.cue.vy=0;failSound();showOverlay('Faul!','Beyaz top deliğe girdi','Bu bölüm baştan başlayacak.',`Bölüm ${S.levelIndex+1}`,'Tekrar Başlat','restart')}
@@ -223,6 +239,18 @@ function collideBalls(a,b,allowTrigger=false){
 function checkHoles(ball,isCue=false){
   for(const hole of S.holes){const dx=ball.x-hole.x,dy=ball.y-hole.y,d=Math.hypot(dx,dy);if(isCue){if(d<hole.inner-1){cueFallsInHole();return true}}else if(d<hole.inner-2){handleHoleBonus(ball,hole);return true}if(d<hole.r+8){const f=(hole.r+8-d)*.0035;if(d>.1){ball.vx+=(hole.x-ball.x)/d*f;ball.vy+=(hole.y-ball.y)/d*f}}}return false;
 }
+function checkBoostZones(ball){
+  if(!S.boostZones.length||ball.dead)return;
+  for(const zone of S.boostZones){
+    const d=Math.hypot(ball.x-zone.x,ball.y-zone.y),key=ball._key;
+    if(d<=zone.r){
+      if(!zone.inside.has(key)&&speed(ball)>.25){
+        zone.inside.add(key);ball.vx*=zone.mult;ball.vy*=zone.mult;S.boostSerial++;
+        boostSound();addPopup('5× BLUE FLAME!',ball.x,ball.y-34,'#84eaff',true);addGoldSpark(ball.x,ball.y,12);addParticles(ball.x,ball.y,205,16);
+      }
+    }else if(d>zone.r+12){zone.inside.delete(key)}
+  }
+}
 function shoot(){
   if(!S.dragPoint||S.finished||!allStopped())return;const dx=S.cue.x-S.dragPoint.x,dy=S.cue.y-S.dragPoint.y,len=Math.hypot(dx,dy);if(len<8)return;const pull=Math.min(CFG.maxPull,len),power=6.2+pull*.115,nx=dx/len,ny=dy/len;startTimer();S.cue.vx=nx*power;S.cue.vy=ny*power;S.shots++;S.shotComboCount=0;S.shotRegisteredHits.clear();updateHud();ui.status.textContent='Atış yapıldı. Zinciri izle!';hitSound(.9)
 }
@@ -230,19 +258,31 @@ function showOverlay(title,big,text,meta,btn,action){S.finished=true;S.nextActio
 ui.overlayBtn.onclick=()=>{ensureAudio();ui.overlay.style.display='none';if(S.nextAction==='restart')loadLevel(S.levelIndex);else if(S.nextAction==='next')loadLevel(Math.min(S.levelIndex+1,LEVELS.length-1));else loadLevel(0)};
 
 function update(dt){
-  if(S.startedAt!=null&&!S.finished)S.elapsed=(now()-S.startedAt)/1000;for(const h of S.holes)h.pulse+=dt*.04;const movers=[S.cue,...S.targets.filter(t=>!t.dead)];
-  for(const o of movers){o.x+=o.vx*dt;o.y+=o.vy*dt;o.vx*=CFG.friction;o.vy*=CFG.friction;if(speed(o)<CFG.rest){o.vx=0;o.vy=0}collideRails(o);for(const ob of S.obstacles)collideRect(o,ob)}
-  for(const t of S.targets)if(!t.dead)collideBalls(S.cue,t,true);
-  for(let i=0;i<S.targets.length;i++)for(let j=i+1;j<S.targets.length;j++){const a=S.targets[i],b=S.targets[j];if(a.dead||b.dead)continue;const ah=a.hit,bh=b.hit;collideBalls(a,b,ah);collideBalls(b,a,bh)}
-  if(!S.finished&&S.holes.length){if(checkHoles(S.cue,true))return;for(const t of S.targets)if(!t.dead)checkHoles(t,false)}
+  if(S.startedAt!=null&&!S.finished)S.elapsed=(now()-S.startedAt)/1000;
+  for(const h of S.holes)h.pulse+=dt*.04;for(const z of S.boostZones)z.pulse+=dt*.055;
+  const active=[S.cue,...S.targets.filter(t=>!t.dead)],maxV=Math.max(0,...active.map(speed));
+  const substeps=maxV>40?5:1,stepDt=dt/substeps,stepFriction=Math.pow(CFG.friction,1/substeps);
+  for(let step=0;step<substeps;step++){
+    const movers=[S.cue,...S.targets.filter(t=>!t.dead)];
+    for(const o of movers){
+      o.x+=o.vx*stepDt;o.y+=o.vy*stepDt;o.vx*=stepFriction;o.vy*=stepFriction;if(speed(o)<CFG.rest){o.vx=0;o.vy=0}
+      collideRails(o);for(const ob of S.obstacles)collideRect(o,ob);checkBoostZones(o);
+    }
+    for(const t of S.targets)if(!t.dead)collideBalls(S.cue,t,true);
+    for(let i=0;i<S.targets.length;i++)for(let j=i+1;j<S.targets.length;j++){const a=S.targets[i],b=S.targets[j];if(a.dead||b.dead)continue;const ah=a.hit,bh=b.hit;collideBalls(a,b,ah);collideBalls(b,a,bh)}
+    if(!S.finished&&S.holes.length){if(checkHoles(S.cue,true))return;for(const t of S.targets)if(!t.dead)checkHoles(t,false)}
+  }
   const n=now();for(const t of S.targets)if(!t.dead&&t.hit&&n-t.hitAt>CFG.vanishDelay){t.dead=true;addParticles(t.x,t.y,t.h,18);hitSound(.5)}
   for(let i=S.particles.length-1;i>=0;i--){const p=S.particles[i];p.x+=p.vx*dt*.95;p.y+=p.vy*dt*.95;p.vx*=.97;p.vy*=.97;p.life-=1.15;if(p.life<=0)S.particles.splice(i,1)}
   for(let i=S.sparks.length-1;i>=0;i--){const p=S.sparks[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.96;p.vy*=.96;p.life-=1.25;if(p.life<=0)S.sparks.splice(i,1)}
   for(let i=S.popups.length-1;i>=0;i--){const p=S.popups[i];p.y-=p.vy*dt;p.life-=1.4;if(p.life<=0)S.popups.splice(i,1)}
   updateHud();
   const left=S.targets.filter(t=>!t.dead).length;
-  if(!S.finished&&left===0){applauseSound();rewardSound(5);if(S.levelIndex<LEVELS.length-1){showOverlay('Bölüm Temiz!',S.elapsed.toFixed(1)+' sn',S.levelIndex===0?'Şimdi orta delikli Double Perfect bölümüne geçiyorsun.':'Şimdi Royal Twin Pockets: iki delikli lüks masa.',`${S.shots} atış • ${S.coins} ödül`,`${S.levelIndex+2}. Bölüme Geç`,'next')}else showOverlay('Tebrikler!',S.elapsed.toFixed(1)+' sn','Tüm premium bölümleri tamamladın.',`${S.shots} atış • ${S.coins} ödül`,'Baştan Oyna','done')}
-  else if(!S.finished&&allStopped()&&S.startedAt!=null)ui.status.textContent='Hazır. Beyaz topu geriye çekip yeni atış yapabilirsin.';
+  if(!S.finished&&left===0){
+    applauseSound();rewardSound(5);
+    if(S.levelIndex<LEVELS.length-1){const next=LEVELS[S.levelIndex+1];showOverlay('Bölüm Temiz!',S.elapsed.toFixed(1)+' sn',`Sıradaki: ${next.name}`,`${S.shots} atış • ${S.coins} ödül`,`${S.levelIndex+2}. Bölüme Geç`,'next')}
+    else showOverlay('Tebrikler!',S.elapsed.toFixed(1)+' sn','Beş premium bölümü tamamladın.',`${S.shots} atış • ${S.coins} ödül`,'Baştan Oyna','done')
+  }else if(!S.finished&&allStopped()&&S.startedAt!=null)ui.status.textContent='Hazır. Beyaz topu geriye çekip yeni atış yapabilirsin.';
 }
 
 function pathTable(){const {cx,topY,bottomY,topW,bottomW}=S.table,p=new Path2D();p.moveTo(cx-topW/2,topY);p.lineTo(cx+topW/2,topY);p.lineTo(cx+bottomW/2,bottomY);p.lineTo(cx-bottomW/2,bottomY);p.closePath();return p}
@@ -306,6 +346,21 @@ function drawTable(){
     ctx.strokeStyle='rgba(255,255,255,.2)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(hole.x-3,hole.y-3,hole.inner-2,Math.PI*1.1,Math.PI*1.8);ctx.stroke();
   }
 }
+function drawBoostZones(){
+  for(const z of S.boostZones){
+    const pulse=(Math.sin(z.pulse)+1)/2;
+    ctx.save();
+    const halo=ctx.createRadialGradient(z.x,z.y,3,z.x,z.y,z.r+30);halo.addColorStop(0,'rgba(120,245,255,.18)');halo.addColorStop(.42,`rgba(25,150,255,${.18+.10*pulse})`);halo.addColorStop(1,'rgba(0,70,255,0)');ctx.fillStyle=halo;ctx.beginPath();ctx.arc(z.x,z.y,z.r+30,0,Math.PI*2);ctx.fill();
+    const core=ctx.createRadialGradient(z.x,z.y,3,z.x,z.y,z.r);core.addColorStop(0,'rgba(215,255,255,.42)');core.addColorStop(.34,'rgba(51,207,255,.28)');core.addColorStop(.72,'rgba(16,91,255,.20)');core.addColorStop(1,'rgba(9,41,160,.05)');ctx.fillStyle=core;ctx.beginPath();ctx.arc(z.x,z.y,z.r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=`rgba(113,229,255,${.55+.25*pulse})`;ctx.lineWidth=3;ctx.shadowColor='#36bfff';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(z.x,z.y,z.r-2,0,Math.PI*2);ctx.stroke();
+    // animated flame tongues
+    for(let i=0;i<9;i++){
+      const a=(i/9)*Math.PI*2+z.pulse*.35,rr=z.r*(.34+.28*((i%3)/2)),fx=z.x+Math.cos(a)*rr,fy=z.y+Math.sin(a)*rr*.7;
+      const fh=18+8*Math.sin(z.pulse+i*1.7),grad=ctx.createLinearGradient(fx,fy+fh*.5,fx,fy-fh);grad.addColorStop(0,'rgba(20,80,255,0)');grad.addColorStop(.45,'rgba(36,165,255,.55)');grad.addColorStop(1,'rgba(185,252,255,.85)');ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(fx-6,fy+8);ctx.quadraticCurveTo(fx-9,fy-4,fx,fy-fh);ctx.quadraticCurveTo(fx+9,fy-4,fx+6,fy+8);ctx.closePath();ctx.fill();
+    }
+    ctx.shadowBlur=0;ctx.font='900 17px Inter,system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(226,253,255,.95)';ctx.shadowColor='#008cff';ctx.shadowBlur=8;ctx.fillText('5× SPEED',z.x,z.y+6);ctx.restore();
+  }
+}
 function drawObstacle(o){
   // brass-trim mahogany bumper
   ctx.save();ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=10;ctx.shadowOffsetY=5;ctx.beginPath();ctx.roundRect(o.x,o.y,o.w,o.h,o.r);const g=ctx.createLinearGradient(o.x,o.y,o.x,o.y+o.h);g.addColorStop(0,'#a97349');g.addColorStop(.35,'#7a4a2d');g.addColorStop(1,'#452718');ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#d3a84c';ctx.lineWidth=2;ctx.stroke();ctx.restore();ctx.beginPath();ctx.roundRect(o.x+4,o.y+4,o.w-8,Math.max(6,o.h*.22),Math.min(7,o.r-2));ctx.fillStyle='rgba(255,255,255,.10)';ctx.fill();
@@ -316,6 +371,7 @@ function drawBall(b,isCue=false){
   ctx.fillStyle='rgba(0,0,0,.30)';ctx.beginPath();ctx.ellipse(b.x+1,b.y+b.r*.92,b.r*1.02,b.r*.34,0,0,Math.PI*2);ctx.fill();
   // ambient glow for colored marbles
   if(!isCue){const halo=ctx.createRadialGradient(b.x,b.y,2,b.x,b.y,b.r*1.65);halo.addColorStop(0,`hsla(${b.h},95%,64%,.14)`);halo.addColorStop(1,`hsla(${b.h},95%,64%,0)`);ctx.fillStyle=halo;ctx.beginPath();ctx.arc(b.x,b.y,b.r*1.65,0,Math.PI*2);ctx.fill()}
+  if(b.bonus&&!isCue){const bg=ctx.createRadialGradient(b.x,b.y,b.r*.8,b.x,b.y,b.r*1.75);bg.addColorStop(0,'rgba(255,227,118,0)');bg.addColorStop(.62,'rgba(255,204,61,.14)');bg.addColorStop(1,'rgba(255,175,0,0)');ctx.fillStyle=bg;ctx.beginPath();ctx.arc(b.x,b.y,b.r*1.75,0,Math.PI*2);ctx.fill()}
   // sphere body
   const g=ctx.createRadialGradient(b.x-b.r*.38,b.y-b.r*.45,2,b.x+b.r*.12,b.y+b.r*.12,b.r*1.15);
   if(isCue){g.addColorStop(0,'#ffffff');g.addColorStop(.34,'#f8fbfd');g.addColorStop(.7,'#d8e0e6');g.addColorStop(1,'#8b98a4')}
@@ -327,6 +383,7 @@ function drawBall(b,isCue=false){
   ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.ellipse(b.x-b.r*.35,b.y-b.r*.42,b.r*.28,b.r*.15,-.45,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(b.x+b.r*.24,b.y+b.r*.22,b.r*.14,b.r*.08,-.3,0,Math.PI*2);ctx.fill();
   // rim
   ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(b.x,b.y,b.r-.6,0,Math.PI*2);ctx.stroke();
+  if(b.bonus&&!isCue){ctx.strokeStyle='#ffd86c';ctx.shadowColor='#ffc02f';ctx.shadowBlur=9;ctx.lineWidth=3;ctx.beginPath();ctx.arc(b.x,b.y,b.r+4,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0}
   if(b.hit){const p=(now()-b.hitAt)/CFG.vanishDelay;ctx.strokeStyle=`rgba(255,229,157,${.85-p*.55})`;ctx.lineWidth=3;ctx.beginPath();ctx.arc(b.x,b.y,b.r+8+p*20,0,Math.PI*2);ctx.stroke()}
   ctx.restore();
 }
@@ -341,7 +398,7 @@ function drawAim(){
 }
 function drawParticles(){for(const p of S.particles){ctx.save();ctx.globalAlpha=clamp(p.life/30,0,1);ctx.fillStyle=`hsl(${p.h},95%,72%)`;ctx.beginPath();ctx.arc(p.x,p.y,2.7,0,Math.PI*2);ctx.fill();ctx.restore()}for(const p of S.sparks){ctx.save();ctx.globalAlpha=clamp(p.life/26,0,1);ctx.fillStyle='#ffe49a';ctx.shadowColor='#f1c95a';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.restore()}}
 function drawPopups(){for(const p of S.popups){ctx.save();ctx.globalAlpha=clamp(p.life/48,0,1);ctx.fillStyle=p.color;ctx.font=`${p.big?900:800} ${p.big?28:20}px Inter,system-ui`;ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=8;ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=5;ctx.strokeText(p.text,p.x,p.y);ctx.fillText(p.text,p.x,p.y);ctx.restore()}}
-function draw(){drawTable();for(const o of S.obstacles)drawObstacle(o);drawAim();for(const t of S.targets)drawBall(t,false);drawBall(S.cue,true);drawParticles();drawPopups()}
+function draw(){drawTable();drawBoostZones();for(const o of S.obstacles)drawObstacle(o);drawAim();for(const t of S.targets)drawBall(t,false);drawBall(S.cue,true);drawParticles();drawPopups()}
 function loop(ts){if(!S.last)S.last=ts;const dt=Math.min(24,ts-S.last)/16.666;S.last=ts;if(!S.finished)update(dt);draw();requestAnimationFrame(loop)}
 function localPoint(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 canvas.addEventListener('pointerdown',e=>{ensureAudio();if(S.finished||!allStopped())return;const p=localPoint(e);if(dist(p,S.cue)<=S.cue.r+28){S.dragging=true;S.dragPoint=p;try{canvas.setPointerCapture(e.pointerId)}catch(_){}}});
